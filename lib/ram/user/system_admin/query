@@ -1,0 +1,38 @@
+#!/usr/bin/python
+
+import libuser
+
+import ram.symbols
+
+
+if __name__ == '__main__':
+    config = ram.symbols()
+
+    admin = libuser.admin()
+    existing = admin.enumerateUsers()
+
+    config['username'] = ""
+    config['password'] = ""
+    config['useshell'] = ""
+    config['ingroups'] = ""
+    for name in reversed(existing):
+        user = admin.lookupUserByName(name)
+        if user[libuser.GECOS][0] == "#":
+            config['username'] = name
+            if user[libuser.USERPASSWORD][0][0] == "$":
+                config['password'] = user[libuser.USERPASSWORD][0]
+            elif user[libuser.SHADOWPASSWORD][0][0] == "$":
+                config['password'] = user[libuser.SHADOWPASSWORD][0]
+            else:
+                config['password'] = ""
+            config['useshell'] = user[libuser.LOGINSHELL][0]
+            config['ingroups'] = " ".join([
+                group for group in
+                admin.enumerateGroupsByUser(name)
+                if not group == name
+            ])
+            break
+
+    config['existing'] = " ".join(existing)
+
+    ram.symbols.send(config)

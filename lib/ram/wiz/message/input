@@ -1,0 +1,20 @@
+#!/usr/bin/python
+
+import ram.widgets
+
+
+if __name__ == '__main__':
+    params = ram.param()
+
+    if params.text and params.file:
+        raise SystemExit("Parameters `text` and `file` cannot be used same time.")
+
+    if params.file:
+        text = open(params.file).read()
+    else:
+        text = params.text
+    
+    ram.widgets.ShowMessage(
+        params.header,
+        text,
+    )

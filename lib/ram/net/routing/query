@@ -1,0 +1,21 @@
+#!/usr/bin/python
+
+import ram.symbols
+
+
+if __name__ == '__main__':
+    config = ram.query('net.network')
+
+    ifaces = [
+        ifname for ifname in config['ifconfig'].keys()
+        if config['ifconfig'][ifname]['enabled']
+    ]
+
+    for ifname in ifaces:
+        config['routing'][ifname]['usedhcp'] = config['ifconfig'][ifname]['usedhcp']
+        config['routing'][ifname]['ignored'] = config['ifconfig'][ifname]['ignored']
+        config['routing'][ifname]['gateway'] = config['ifconfig'][ifname]['gateway']
+
+    config['routing']['ifaces'] = " ".join(sorted(ifaces))
+
+    ram.symbols.send(config['routing'])

@@ -1,0 +1,65 @@
+#!/usr/bin/python
+
+import syslog
+
+import ram.context
+import ram.widgets
+
+
+with ram.context(__name__):
+    from user.entry import RunUsernamePasswordInput, SHA512
+
+
+if __name__ == '__main__':
+    params = ram.param()
+    config = ram.query()
+
+    if not config['username']:
+        username = params.user
+        password = ""
+        ingroups = " ".join(params.groups.split(","))
+        useshell = params.shell
+        editable = params.edit
+        existing = config['existing'].split() if params.forcenew else []
+        banned = existing + ([] if params.rootok else ["root"])
+    else:
+        username = config['username']
+        password = "" if params.forcenew else config['password']
+        ingroups = config['ingroups']
+        useshell = config['useshell']
+        editable = False
+        banned = []
+
+    try:
+        username, password = RunUsernamePasswordInput(
+            "Enter credentials for the system access",
+            (
+                "Specify username and password for the system administrative account.\n"
+                if editable else
+                "Type new password for `%s` system administrative account.\n" % username
+            ),
+            username=username,
+            password=password,
+            editable=editable,
+            hashes=[SHA512],
+            banned=banned,
+            forced=params.forced,
+            pwdict=params.dict,
+        )
+    except RuntimeError as err:
+        raise SystemExit(str(err))
+
+    if password:
+        config['username'] = username
+        config['password'] = password
+        config['ingroups'] = ingroups
+        config['useshell'] = useshell
+
+        syslog.openlog("passwd", 0, 10 << 3)
+        syslog.syslog("the system administrative account password has been changed.")
+        syslog.closelog()
+
+        if not params.forced:
+            ram.widgets.ShowMessage(username, "Password has been changed.")
+
+    ram.store(input=config)

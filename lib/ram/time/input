@@ -1,0 +1,90 @@
+#!/usr/bin/python
+
+from __future__ import print_function
+
+import time
+
+import ram
+import ram.context
+import ram.widgets
+import ram.process
+import ram.watches
+
+
+with ram.context(__name__):
+    from time import ntp_sync
+    from time import datetime
+    from time import timezone
+
+
+if __name__ == '__main__':
+    params = ram.param()
+    ntp_config = ram.query(ntp_sync)
+
+    def __IsTimeSyncEnabled():
+        return ntp_config['ntpsync'] and ntp_config['ntpservers']
+
+    def __ConfigureClockNow():
+        if not __IsTimeSyncEnabled() or ram.widgets.AskViaButtons(
+            "Set the system clock manually?",
+            "Currently NTP synchronization is used for date and time.\n\n"
+            "Would you like to set the system clock now?\n"
+        ):
+            __ConfigureDateTime()
+            ntp_config['ntpsync'] = ''
+
+    def __ConfigureDateTime():
+        ram.setup(datetime, 'wizard' if params.wizard else '')
+
+    def __ConfigureTimeZone():
+        ram.setup(timezone, 'forced' if params.wizard else '')
+
+    def __ConfigureTimeSync():
+        if __IsTimeSyncEnabled() or ram.widgets.AskViaButtons(
+            "Use NTP to set clock?",
+            "Select whether you want to obtain date and time "
+            "for this machine via NTP protocol. You'll have to "
+            "enter address of NTP servers in this case.\n\n"
+            "Would you like to enable NTP synchronization?\n",
+        ):
+            ram.setup(ntp_sync, 'wizard' if params.wizard else '')
+            ntp_config['ntpsync'] = 'ntpsync'
+            ntp_config['ntpservers'] = ram.query(ntp_sync)['ntpservers']
+
+    def __MkDateTimeMenu():
+        timestr = time.strftime('%F %T %Z', time.localtime())
+        if __IsTimeSyncEnabled():
+            servers = "%s item(s) ..." % len(ntp_config['ntpservers'].split())
+        else:
+            servers = "..."
+
+        timeonly = [
+            ("%-4s %-24s" % ("Now:", timestr), __ConfigureClockNow),
+            ("", 0),
+            ("%-4s %-24s" % ("NTP:", servers), __ConfigureTimeSync),
+        ]
+
+        timezone = [
+            ("Configure timezone ...", __ConfigureTimeZone),
+        ]
+
+        return timeonly + (timezone if not params.hidetz else [])
+
+    if params.wizard:
+        __ConfigureTimeZone()
+        __ConfigureTimeSync()
+
+        if not __IsTimeSyncEnabled() and ram.widgets.AskViaButtons(
+            "Set the system clock manually?",
+            "Would you like to set the system clock now?\n"
+        ):
+            __ConfigureDateTime()
+    else:
+        with ram.watches.watch_timer() as w_timer:
+            ram.widgets.RunMenu(
+                "Select action",
+                __MkDateTimeMenu,
+                watches={w_timer: True},
+            )
+
+    ram.store(ntp_sync, input=ntp_config)

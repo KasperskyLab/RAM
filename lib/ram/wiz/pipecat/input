@@ -1,0 +1,55 @@
+#!/usr/bin/python
+
+import ram.widgets
+
+import os
+from glob import iglob
+from subprocess import Popen, PIPE
+
+if __name__ == '__main__':
+    params = ram.param()
+
+    if not params.source:
+        raise SystemExit("mandatory argument 'source' is omitted.")
+
+    source = []
+    errors = []
+    for file in sorted(iglob(params.source)):
+        try:
+            source += [open(file, 'r')]
+        except Exception as e:
+            errors += ["cannot access file `%s`: %s." % (file, str(e))]
+
+    if errors:
+        raise SystemExit("\n".join(errors))
+
+    if not source:
+        raise SystemExit("cannot access file `%s`." % params.source)
+
+    params.target = params.target or os.devnull
+
+    if params.target:
+        try:
+            target = open(params.target, 'w')
+        except Exception as e:
+            raise SystemExit("cannot access file `%s`: %s." % (params.target, str(e)))
+
+    if not params.pipeto:
+        raise SystemExit("mandatory argument 'pipeto' is omitted.")
+
+    pipeto = Popen(params.pipeto, stdin=PIPE, stdout=target, stderr=None, close_fds=True, shell=True)
+
+    size = sum(os.stat(file.name).st_size for file in source)
+
+    def pipecat(source=source, pipeto=pipeto, blk_size=4096):
+        done = 0
+        while source:
+            file = source.pop(0)
+            buffer = os.read(file.fileno(), blk_size)
+            while buffer:
+                pipeto.stdin.write(buffer)
+                done += len(buffer)
+                yield done
+                buffer = os.read(file.fileno(), blk_size)
+
+    ram.widgets.ShowProgress(params.header or "Piping ...", "", pipecat(), length=size)

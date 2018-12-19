@@ -1,0 +1,11 @@
+#!/usr/bin/python
+
+import ram.symbols
+
+
+if __name__ == '__main__':
+    config = ram.query('net.network')
+
+    config['ifconfig'] = ram.symbols.recv()
+
+    ram.store('net.network', input=config)

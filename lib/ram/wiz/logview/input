@@ -1,0 +1,57 @@
+#!/usr/bin/python
+
+import os.path
+
+import ram.widgets
+import ram.process
+
+
+_show_help = True
+
+
+def ViewFile(filename):
+    global _show_help
+    if _show_help and not ram.widgets.AskViaButtons(
+        "Log viewer",
+        "The menu is about to launch `less` command to view log file, "
+        "the following hotkeys could be used while in `less`:\n"
+        "\n"
+        "    - press `h` for help;\n"
+        "    - press `q` for quit.\n",
+        "Continue",
+        "Don't show this message again",
+    ):
+        _show_help = False
+    ram.process.launch([ram.which()['logview.sh'], filename])
+
+
+def ViewLogs(logs):
+    try:
+        files = []
+        dires = []
+        for entry in sorted(os.listdir(logs)):
+            _fname = os.path.join(logs, entry)
+            if os.path.islink(_fname):
+                pass
+            elif os.path.isfile(_fname):
+                files.append(entry)
+            elif os.path.isdir(_fname):
+                dires.append(entry)
+    except OSError as err:
+        return ram.widgets.ShowError(logs, str(err))
+
+    def __DireItem(dname):
+        return ("View subdirectory '%s'..." % dname, lambda: ViewLogs(os.path.join(logs, dname)))
+
+    def __FileItem(fname):
+        return ("View file '%s'" % fname, lambda: ViewFile(os.path.join(logs, fname)))
+
+    diremenu = [__DireItem(dname) for dname in dires]
+    filemenu = [__FileItem(fname) for fname in files]
+
+    ram.widgets.RunMenu("Select Action", diremenu + filemenu)
+
+if __name__ == '__main__':
+    params = ram.param()
+
+    ViewLogs(params.logs)

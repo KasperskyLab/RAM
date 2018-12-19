@@ -1,0 +1,9 @@
+Generic unit to display pipe data transfer progress.
+
+Parameters:
+    source=	source file that will be piped to `pipeto` stdin.
+		file size is used to estimate progress.
+    pipeto=	command passed to shell unchanged.
+    target=	target file that will be piped from `pipeto` stdout.
+		/dev/null will be used by default.
+    header=	sets header for progress bar dialog.

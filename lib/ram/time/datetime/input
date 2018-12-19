@@ -1,0 +1,154 @@
+#!/usr/bin/python
+
+import datetime
+from calendar import monthrange
+from dateutil import relativedelta
+
+import ram.widgets
+import ram.process
+import ram.watches
+
+
+class DateTimeControl(object):
+    def __init__(self, format):
+        self.dttm = datetime.datetime.now()
+        self.DiscardDelta(ram.widgets.ACTION_SET)
+        self.format = format
+
+    def __call__(self):
+        temp_dttm = datetime.datetime(self.year, self.month, self.day, self.hour, self.minute, self.second, self.micros)
+        timedelta = relativedelta.relativedelta(temp_dttm, self.dttm)
+        self.dttm = datetime.datetime.now()
+        temp_dttm = self.dttm + timedelta
+
+        self.year = temp_dttm.year
+        self.month = temp_dttm.month
+        self.day = temp_dttm.day
+        self.hour = temp_dttm.hour
+        self.minute = temp_dttm.minute
+        self.second = temp_dttm.second
+        self.micros = temp_dttm.microsecond
+
+    def DiscardDelta(self, action):
+        if action == ram.widgets.ACTION_SET:
+            self.year = self.dttm.year
+            self.month = self.dttm.month
+            self.day = self.dttm.day
+            self.hour = self.dttm.hour
+            self.minute = self.dttm.minute
+            self.second = self.dttm.second
+            self.micros = self.dttm.microsecond
+
+    def UpdateYear(self, action):
+        if action == ram.widgets.ACTION_INC and self.year < 9999:
+            self.year += 1
+        if action == ram.widgets.ACTION_DEC and self.year > 1:
+            self.year -= 1
+
+        daylimit = monthrange(self.year, self.month)[1]
+        self.day = min(self.day, daylimit)
+
+    def UpdateMonth(self, action):
+        if action == ram.widgets.ACTION_INC:
+            self.month = ((self.month + 1 - 1) % 12) + 1
+        if action == ram.widgets.ACTION_DEC:
+            self.month = ((self.month - 1 - 1) % 12) + 1
+
+        daylimit = monthrange(self.year, self.month)[1]
+        self.day = min(self.day, daylimit)
+
+    def UpdateDay(self, action):
+        limit = monthrange(self.year, self.month)[1]
+
+        if action == ram.widgets.ACTION_INC:
+            self.day = ((self.day + 1 - 1) % limit) + 1
+        if action == ram.widgets.ACTION_DEC:
+            self.day = ((self.day - 1 - 1) % limit) + 1
+
+    def UpdateHour(self, action):
+        if action == ram.widgets.ACTION_INC:
+            self.hour = ((self.hour + 1) % 24)
+        if action == ram.widgets.ACTION_DEC:
+            self.hour = ((self.hour - 1) % 24)
+
+    def UpdateMinute(self, action):
+        if action == ram.widgets.ACTION_INC:
+            self.minute = ((self.minute + 1) % 60)
+        if action == ram.widgets.ACTION_DEC:
+            self.minute = ((self.minute - 1) % 60)
+
+    def UpdateSecond(self, action):
+        if action == ram.widgets.ACTION_INC:
+            self.second = ((self.second + 1) % 60)
+        if action == ram.widgets.ACTION_DEC:
+            self.second = ((self.second - 1) % 60)
+
+    def SwitchFormat(self, action):
+        if action:
+            self.format = not self.format
+
+    @property
+    def period(self):
+        if self.format:
+            return ""
+        else:
+            return "am" if self.hour < 12 else "pm"
+
+    @property
+    def pphour(self):
+        if self.format:
+            return self.hour
+        else:
+            return (self.hour % 12) or 12
+
+    def __str__(self):
+        self()
+        return str(datetime.datetime(self.year, self.month, self.day, self.hour, self.minute, self.second))
+
+
+if __name__ == '__main__':
+    config = ram.query()
+    params = ram.param()
+
+    dtmctl = DateTimeControl(not bool(config['format']))
+
+    def __MkDateTimeMenu():
+        dtmctl()
+
+        return [
+            ("%-12s   %04s   " % ("Format:", "24h." if dtmctl.format else "12h."), dtmctl.SwitchFormat),
+            ("", 0),
+            ("%-12s < %04i >" % ("Year:", dtmctl.year), dtmctl.UpdateYear),
+            ("%-12s <  %02i  >" % ("Month:", dtmctl.month), dtmctl.UpdateMonth),
+            ("%-12s <  %02i  >" % ("Day:", dtmctl.day), dtmctl.UpdateDay),
+            ("", 1),
+            ("%-12s <  %02i  >" % ("Hour:", dtmctl.pphour), dtmctl.UpdateHour),
+            ("%-12s <  %02i  >" % ("Min.:", dtmctl.minute), dtmctl.UpdateMinute),
+            ("%-12s <  %02i  >" % ("Sec.:", dtmctl.second), dtmctl.UpdateSecond),
+            ("%-12s    %02s   " % ("", dtmctl.period), 2),
+            ("", 3),
+            ("Discard changes", dtmctl.DiscardDelta),
+        ]
+
+    while dtmctl:
+        with ram.watches.watch_timer() as w_timer:
+            ram.widgets.RunMenu(
+                "Set the system clock",
+                __MkDateTimeMenu,
+                itemExit=params.wizard,
+                doAction=True,
+                watches={w_timer: True},
+            )
+
+        if ram.process.launch('date -s "%s"' % dtmctl) and ram.widgets.AskViaButtons(
+            "Reconfigure date and time?",
+            "Date and time update has been failed.\n\n"
+            "Would you like to reconfigure the date and time?\n"
+        ):
+            dtmctl.DiscardDelta(ram.widgets.ACTION_SET)
+        else:
+            break
+
+    config['format'] = "period" if not dtmctl.format else ""
+
+    ram.store(input=config)

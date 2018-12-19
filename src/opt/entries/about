@@ -1,0 +1,8 @@
+Generic unit to configure sections in configuration files.
+
+Parameters:
+    format=	should be either `ini` or `env`.
+    dirpath=	directory for `env` or full path for `ini`.
+    section=	filename for `env` or section name for `ini`.
+    keys=	comma-separated list of keys, the key name should be
+		preceded with underscope to treat it as password field.

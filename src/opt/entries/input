@@ -1,0 +1,43 @@
+#!/usr/bin/python
+
+from ram import widgets
+
+from ram.unitlib import Params
+from ram.unitlib import Failed
+
+from ram.formats import ini, env
+
+
+formats = {
+    'ini': ini,
+    'env': env,
+}
+
+if __name__ == '__main__':
+    params = Params()
+
+    if params.format not in formats:
+        Failed("mandatory argument 'format' should be either `ini` or `env`.")
+
+    cfgfmt = formats[params.format]
+
+    if not params.dirpath:
+        Failed("mandatory argument 'dirpath' is omitted.")
+
+    config = cfgfmt.cfgopen(params.dirpath, params.section, readonly=False)
+
+    if not params.keys:
+        Failed("mandatory argument 'keys' is omitted.")
+
+    keys = params.keys.split(',')
+    values = [config[key.lstrip('_')] for key in keys]
+
+    values = widgets.AskEntries(
+        "Enter configuration parameters for `%s`" % params.section,
+        "", zip(keys, values), True
+    )
+
+    for key, value in zip(keys, values):
+        config[key.lstrip('_')] = value
+
+    config.sync()

@@ -1,0 +1,36 @@
+#!/bin/sh
+
+. /usr/share/ram/ram.functions
+
+ntpsync=`ram print - ntpsync`
+servers=`ram print - ntpservers`
+
+ts_config=`stat -c %Y /etc/ntp.conf || echo 0`
+
+if ! which systemctl >&/dev/null; then
+	in_effect=`stat -c %Y /var/lock/subsys/ntpd || echo $ts_config`
+elif systemctl is-active --quiet ntpd.service; then
+	in_effect=$(date -d "$(LC_ALL=C systemctl show ntpd.service -p ActiveEnterTimestamp | grep -o "[^=]*$")" +%s)
+elif systemctl is-failed --quiet ntpd.service; then
+	in_effect=$(date -d "$(LC_ALL=C systemctl show ntpd.service -p InactiveEnterTimestamp | grep -o "[^=]*$")" +%s)
+else
+	in_effect=$ts_config
+fi
+
+if [ -z "$ntpsync" -o -z "$servers" ]; then
+	if service ntpd status &>/dev/null; then
+		service ntpd stop
+	fi
+elif [ "$in_effect" -lt "$ts_config" ]; then
+	if service ntpd status &>/dev/null; then
+		service ntpd stop
+	fi
+	if ! service ntpd status &>/dev/null; then
+		service ntpd start
+	fi
+else
+	if ! service ntpd status &>/dev/null; then
+		service ntpd start
+	fi
+fi
+

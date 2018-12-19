@@ -1,0 +1,15 @@
+#!/usr/bin/python
+
+import ram.symbols
+
+
+if __name__ == '__main__':
+    config = ram.query('net.network')
+
+    config['routing'] = ram.symbols.recv()
+
+    for ifname in config['routing']['ifaces'].split():
+        config['ifconfig'][ifname]['gateway'] = config['routing'][ifname]['gateway']
+        config['ifconfig'][ifname]['ignored'] = config['routing'][ifname]['ignored']
+
+    ram.store('net.network', input=config)

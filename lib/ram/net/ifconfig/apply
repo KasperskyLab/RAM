@@ -1,0 +1,25 @@
+#!/bin/sh
+
+. /usr/share/ram/ram.functions
+
+NETWORKCFG=/etc/sysconfig/network
+IFCFG_ROOT=/etc/sysconfig/network-scripts
+
+RESOLVCONF=/etc/resolv.conf
+
+shopt -s nullglob
+
+config_ts=`stat -c %Y \
+	"${NETWORKCFG}" \
+	"${IFCFG_ROOT}" \
+	"${IFCFG_ROOT}"/ifcfg-* \
+	"${IFCFG_ROOT}"/route-* \
+	| sort -nr | head -1`
+in_effect=`stat -c %Y /var/lock/subsys/network 2>/dev/null || echo 0`
+
+if [ $in_effect -lt $config_ts ]; then
+	rm -f "${RESOLVCONF}" "${RESOLVCONF}.save"
+	touch "${RESOLVCONF}"
+
+	service network restart
+fi

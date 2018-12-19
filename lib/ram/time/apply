@@ -1,0 +1,4 @@
+#!/bin/sh
+
+ram apply time.datetime
+ram apply time.ntp_sync

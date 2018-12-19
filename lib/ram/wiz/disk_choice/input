@@ -1,0 +1,76 @@
+#!/usr/bin/python
+
+import ram.context
+
+
+with ram.context(__name__):
+    from wiz.utils import ParseBytes
+
+from entry import RunSelectDiskDrive
+
+
+class RunCustomDiskDrive(RunSelectDiskDrive):
+    def __init__(self, size, text=None, dev_path=None, define_cmd=None, select_cmd=None, format_cmd=None):
+        super(RunCustomDiskDrive, self).__init__(size, text=text, dev_path=dev_path)
+
+        if define_cmd:
+            self.define_cmd = lambda dev_path, *args: str(ram.process.output(define_cmd, dev_path))
+        else:
+            self.define_cmd = None
+
+        if format_cmd:
+            self.format_cmd = lambda dev_path, *args: str(ram.process.output(format_cmd, dev_path, *args))
+        else:
+            self.format_cmd = None
+
+        if select_cmd:
+            self.select_cmd = lambda dev_path, *args: str(ram.process.output(select_cmd, dev_path, *args))
+        else:
+            self.select_cmd = None
+
+        self.def_cache = {}
+        self.fmt_cache = {}
+
+        self.fmt_limit = None
+
+    def values_fn(self, dev_path=None):
+        dev_list = super(RunCustomDiskDrive, self).values_fn(dev_path)
+
+        if self.fmt_limit is None:
+            for dev_path in dev_list:
+                self.def_cache[dev_path] = self.define_cmd and self.define_cmd(dev_path).splitlines() or []
+                self.fmt_cache[dev_path] = self.format_cmd and self.format_cmd(dev_path, *self.def_cache[dev_path]) or ''
+                self.fmt_cache[dev_path] = self.fmt_cache[dev_path] and self.fmt_cache[dev_path].splitlines()[0] or ''
+
+            self.fmt_limit = max(len(_) for _ in self.fmt_cache.values())
+
+        return dev_list
+
+    def format_fn(self, dev_path):
+        fmt_text = super(RunCustomDiskDrive, self).format_fn(dev_path)
+        return self.fmt_cache[dev_path].center(self.fmt_limit) + ' ' + fmt_text
+
+    def select_fn(self, dev_path):
+        dev_path = super(RunCustomDiskDrive, self).select_fn(dev_path, ask_wrns=not self.select_cmd)
+        dev_path = self.select_cmd(dev_path, *self.def_cache[dev_path]).strip() if dev_path and self.select_cmd else dev_path
+
+        return dev_path or None
+
+
+if __name__ == '__main__':
+    params = ram.param()
+
+    device = RunCustomDiskDrive(
+        ParseBytes(params.size) if params.size else 0,
+        dev_path=params.device,
+        define_cmd=params.define,
+        format_cmd=params.format,
+        select_cmd=params.select,
+    ).__call__()
+
+    if not device:
+        raise SystemExit("No disks were selected.")
+    elif params.file:
+        print >> open(params.file, 'w'), device
+    else:
+        print device

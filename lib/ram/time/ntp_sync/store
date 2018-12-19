@@ -1,0 +1,10 @@
+#!/usr/bin/python
+
+import ram.symbols
+from utils import store_ntp_servers, store_ntpd_enabled
+
+if __name__ == '__main__':
+    config = ram.symbols.recv()
+
+    store_ntp_servers(config['ntpservers'].rstrip(' ').split(' '))
+    store_ntpd_enabled(config['ntpsync'])

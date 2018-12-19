@@ -1,0 +1,3 @@
+250M	ext2	     	# /boot
+1GB~    ext4         	# /root
+750M    swap		# .swap

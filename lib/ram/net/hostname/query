@@ -1,0 +1,18 @@
+#!/usr/bin/python
+
+import ram.symbols
+import ram.context
+
+with ram.context(__name__):
+    from net.ifcfg import QueryNetworkConfiguration
+
+if __name__ == '__main__':
+    netcfg = QueryNetworkConfiguration()
+    config = ram.symbols()
+
+    try:
+        config['hostname'] = open('/etc/hostname').read().strip()
+    except Exception:
+        config['hostname'] = netcfg.GetHostname()
+
+    ram.symbols.send(config)

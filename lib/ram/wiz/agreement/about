@@ -1,0 +1,7 @@
+Find suitable EULA files and ask user to agree on terms.
+
+The parameter `path=` is used as a wildcard for EULA file lookup. 
+Suffixes of found files are language identifiers. A user can select 
+file in required language among found variants via menu. Selected file 
+will be displayed with a choice to accept or decline the terms.
+

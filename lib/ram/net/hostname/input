@@ -1,0 +1,30 @@
+#!/usr/bin/python
+
+import ram
+import ram.context
+import ram.widgets
+
+with ram.context(__name__):
+    from net.utils import ValidateHostname
+
+
+# Maximum length of hostname to set is defined via sysconf HOST_NAME_MAX
+# but this identifier is not available via python's os.sysconf interface.
+def __ValidateHostname(value):
+    return ValidateHostname(value, length=64)
+
+
+if __name__ == '__main__':
+    params = ram.param()
+    config = ram.query()
+
+    config['hostname'], = ram.widgets.RunEntry(
+        "Hostname",
+        "Specify hostname for the machine.",
+        [("Hostname", config['hostname'], __ValidateHostname)],
+        allowCancel=not params.forced,
+        supplySaved=not params.erased,
+        waitCorrect=True
+    )
+
+    ram.store(input=config)

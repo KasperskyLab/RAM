@@ -1,0 +1,44 @@
+#!/usr/bin/python
+
+import os
+import shutil
+import ram.symbols
+
+from ram.osutils import TrySubmit
+
+
+def store_timezone(zoneinfo, tz):
+    shutil.copy(os.path.join(zoneinfo, tz), '/etc/localtime.ram')
+    shutil.move('/etc/localtime.ram', '/etc/localtime')
+
+
+def store_timezone_debian(zoneinfo, tz):
+    if not TrySubmit('/etc/timezone', ["%s\n" % tz]):
+        raise IOError("Failed to update timezone configuration.")
+    store_timezone(zoneinfo, tz)
+
+
+def store_timezone_redhat(zoneinfo, tz):
+    if not TrySubmit('/etc/sysconfig/clock', ["UTC=yes\nZONE=%s\n" % tz]):
+        raise IOError("Failed to update timezone configuration.")
+    store_timezone(zoneinfo, tz)
+
+
+def store_timezone_suse(zoneinfo, tz):
+    raise NotImplementedError()
+
+
+if __name__ == '__main__':
+    params = ram.param()
+    config = ram.symbols.recv()
+
+    distro = ram.query('sys.distrib')['base']
+    store_timezone_distro = {
+        'redhat': store_timezone_redhat,
+        'debian': store_timezone_debian,
+        'suse': store_timezone_suse,
+    }.get(distro, lambda: '')
+
+    tz = config['timezone']
+    if tz:
+        store_timezone_distro(params.zoneinfo, tz)

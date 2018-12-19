@@ -1,0 +1,77 @@
+#!/usr/bin/python
+
+import sys
+import getopt
+
+import ram.symbols
+
+try:
+    import simplejson as json
+except ImportError:
+    import json
+
+
+def _symbols_get(config, key):
+    return config[key][:]
+
+def _symbols_set(config, key, value):
+    config[key] = value
+    return config
+
+def _symbols_lst(config, key=None):
+    if key is not None:
+        config = config[key]
+
+    return "\n".join(config.keys())
+
+def _symbols_cut(config, key=None):
+    if key is not None:
+        config = config[key]
+
+    return ram.symbols(config)
+
+def _symbols_put(config, key=None):
+    if key is not None:
+        return ram.symbols({key: config})
+    else:
+        return config
+
+def _symbols_new(config):
+    return config
+
+
+_actions = {
+    'get': _symbols_get,
+    'set': _symbols_set,
+    'lst': _symbols_lst,
+    'cut': _symbols_cut,
+    'put': _symbols_put,
+    'new': _symbols_new,
+}
+
+
+if __name__ == '__main__':
+    inputs = None
+    output = None
+
+    opts, args = getopt.getopt(sys.argv[1:], "i:o:")
+    for _opt, _val in opts:
+        if _opt == '-o':
+            output = _val
+        elif _opt == '-i':
+            inputs = _val
+
+    if inputs == 'json':
+        config = ram.symbols(json.load(sys.stdin))
+    else:
+        config = ram.symbols(sys.stdin)
+
+    action = args.pop(0) if args else 'new'
+    action = _actions[action]
+
+    result = action(config, *args)
+
+    if output == 'json':
+        print json.dumps(result, indent=4)
+    else:
+        print result

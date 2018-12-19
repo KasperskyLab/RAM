@@ -1,0 +1,5 @@
+Create new system user and set password.
+
+Parameters:
+    user=	Force to use this username.
+    groups=	Add user to these groups. Comma-separated list.

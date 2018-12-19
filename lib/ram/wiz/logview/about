@@ -1,0 +1,6 @@
+View system logs using less.
+
+Unit provides tree-based menu for navigating and reading
+system logs. By default logs are looked up at '/var/log',
+but `logs=` parameter allows to alter this behavior.
+

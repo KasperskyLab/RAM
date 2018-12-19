@@ -1,0 +1,56 @@
+#!/usr/bin/python
+
+import ram.symbols
+import ram.context
+
+
+with ram.context(__name__):
+    from net.ifcfg import QueryNetworkConfiguration
+    from net.probe import GetHwIfacesList, GetHwIfaceAddr
+    from net.probe import GetHwIfaceIpAddress, GetHwIfaceIpNetmask
+
+
+if __name__ == '__main__':
+    config = ram.symbols()
+    netcfg = QueryNetworkConfiguration()
+
+    sw_ifaces = set(ifname for ifname in netcfg if not netcfg.IsLoopback(ifname))
+    hw_ifaces = GetHwIfacesList(skip_lo=True)
+
+    # ifconfig
+    for ifname in sw_ifaces:
+        config['ifconfig'][ifname]['hw_addr'] = ""
+        config['ifconfig'][ifname]['ip_used'] = ""
+        config['ifconfig'][ifname]['netmask_used'] = ""
+
+    for ifname in hw_ifaces:
+        config['ifconfig'][ifname]['devname'] = ifname
+        config['ifconfig'][ifname]['enabled'] = ""
+        config['ifconfig'][ifname]['defconf'] = ifname
+        config['ifconfig'][ifname]['hw_addr'] = GetHwIfaceAddr(ifname)
+        config['ifconfig'][ifname]['ip_used'] = GetHwIfaceIpAddress(ifname)
+        config['ifconfig'][ifname]['netmask_used'] = GetHwIfaceIpNetmask(ifname)
+        config['ifconfig'][ifname]['ip_addr'] = ""
+        config['ifconfig'][ifname]['netmask'] = ""
+        config['ifconfig'][ifname]['usedhcp'] = ""
+
+    for ifname in sw_ifaces:
+        config['ifconfig'][ifname]['devname'] = netcfg.GetIfaceDevName(ifname)
+        config['ifconfig'][ifname]['enabled'] = ifname if netcfg.GetIfaceEnabled(ifname) else ""
+        config['ifconfig'][ifname]['usedhcp'] = "dhcp" if netcfg.GetIfaceBootProto(ifname) else ""
+        config['ifconfig'][ifname]['ip_addr'] = netcfg.GetIfaceIpAddress(ifname)
+        config['ifconfig'][ifname]['netmask'] = netcfg.GetIfaceIpNetmask(ifname)
+        config['ifconfig'][ifname]['defconf'] = ""
+        config['ifconfig'][ifname]['ignored'] = "dhcp" if netcfg.GetIfaceGwIgnored(ifname) else ""
+        config['ifconfig'][ifname]['gateway'] = netcfg.GetIfaceIpGateway(ifname)
+
+    # routing
+    config['routing']['default'] = netcfg.GetGatewayDevice()
+
+    # resolver
+    config['resolver']['peerdns'] = netcfg.GetPeerDnsDevice()
+    config['resolver']['pri_dns'] = netcfg.GetIfacePrimaryDns(None)
+    config['resolver']['sec_dns'] = netcfg.GetIfaceSecondaryDns(None)
+    config['resolver']['domains'] = netcfg.GetIfaceSearchList(None)
+
+    ram.symbols.send(config)

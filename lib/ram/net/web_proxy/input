@@ -1,0 +1,94 @@
+#!/usr/bin/python
+
+import ram.context
+import ram.widgets
+
+
+with ram.context(__name__):
+    from user.utils import HiddenText
+    from net.internet.utils import BuildUrl, ParseUrl, ValidateUrl
+
+
+def __ValidateProxyUrl(value):
+    if not value:
+        return value
+    else:
+        return ValidateUrl(value, proto=['http'], allow_path=False)
+
+
+def EditProxyUrl(config):
+    proxyurl = BuildUrl(
+        "http",
+        host=config['host'],
+        port=config['port'],
+        username=config['user'],
+        password=config['password']
+    )
+
+    proxyurl, = ram.widgets.RunEntry(
+        "Proxy configuration",
+        "If you use Proxy to access web resources,\n"
+        "type the Proxy URL in standard format:\n\n"
+        "  http://[user[:password]@]host[:port]\n\n"
+        "Otherwise, leave the field blank.\n\n",
+        [
+            ("Proxy URL", proxyurl, __ValidateProxyUrl),
+        ]
+    )
+
+    if proxyurl:
+        type, host, port, path, user, password = ParseUrl(proxyurl)
+        config['host'] = host
+        config['port'] = port
+        config['user'] = user
+        config['password'] = password
+    else:
+        config['host'] = ""
+        config['port'] = ""
+        config['user'] = ""
+        config['password'] = ""
+
+
+if __name__ == '__main__':
+    config = ram.query()
+    params = ram.param()
+
+    def __SwitchProxyEnabled():
+        config['useproxy'] = "" if config['useproxy'] else "useproxy"
+
+    def __EditProxyHost():
+        EditProxyUrl(config)
+
+    def __EditProxyPort():
+        EditProxyUrl(config)
+
+    def __EditProxyUser():
+        EditProxyUrl(config)
+
+    def __EditProxyPassword():
+        EditProxyUrl(config)
+
+    def __SwitchLocalAddresses():
+        config['forlocal'] = "" if config['forlocal'] else "useproxy"
+
+    def __MkEditProxyConfiguration():
+        return [
+            ("%-16s %-16s" % ("Enabled:", "yes" if config['useproxy'] else "no"), __SwitchProxyEnabled),
+            ("", 0),
+            ("%-16s %-16s" % ("Host:", config['host']), __EditProxyHost),
+            ("%-16s %-16s" % ("Port:", config['port']), __EditProxyPort),
+            ("%-16s %-16s" % ("Username:", config['user']), __EditProxyUser),
+            ("%-16s %-16s" % ("Password:", HiddenText(config['password'])), __EditProxyPassword),
+            ("", 1),
+            (
+                "%-16s %-16s" % (
+                    "Local addresses:",
+                    "use proxy" if config['forlocal'] else "bypass"
+                ),
+                __SwitchLocalAddresses
+            ),
+        ]
+
+    ram.widgets.RunMenu("Select Action - Proxy", __MkEditProxyConfiguration, itemExit=params.wizard)
+
+    ram.store(input=config)

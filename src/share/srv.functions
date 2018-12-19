@@ -1,0 +1,99 @@
+#!/bin/sh
+
+CONSOLETYPE=`/sbin/consoletype` . /etc/init.d/functions
+
+failed_at() {
+	service=$1
+	echo "Failed to start service ${service}."
+	read -p "Press ENTER to continue ..."
+}
+
+service_sysv_off() {
+	service=$1
+	service "$service" status >/dev/null && service "$service" stop
+	chkconfig "$service" off
+}
+
+service_sysv_on() {
+	service=$1
+	service "$service" status >/dev/null && service "$service" stop
+	chkconfig "$service" on
+	service "$service" start
+}
+
+service_systemd_off() {
+	service=$1
+	systemctl stop "$service"
+	systemctl disable "$service"
+}
+
+service_systemd_on() {
+	service=$1
+	systemctl stop "$service"
+	systemctl enable "$service"
+	systemctl start "$service"
+}
+
+tune_services_sysv_if() {
+	required=$1
+	shift
+
+	if [ -n "$required" ]; then
+		for service in "$@"; do
+			service_sysv_on "$service" || failed_at "$service"
+		done
+	else
+		for service in "$@"; do
+			service_sysv_off "$service"
+		done
+	fi
+}
+
+tune_services_systemd_if() {
+	required=$1
+	shift
+
+	if [ -n "$required" ]; then
+		for service in "$@"; do
+			service_systemd_on "$service" || failed_at "$service"
+		done
+	else
+		for service in "$@"; do
+			service_systemd_off "$service"
+		done
+	fi
+}
+
+run_firstboot_cmd() {
+	loglabel=$1
+	local _resvar=$2
+	shift 2
+
+	( set -o pipefail; "$@" 2>&1 | logger -t "${loglabel}" )
+	local res=$?
+	eval "$_resvar='$res'"
+}
+
+default_firstboot_error_handler() {
+	loglabel=$1
+	echo "Failed to configure ${loglabel}."
+	echo "Check logs for ${loglabel} for details."
+	read -p "Press ENTER to continue ..."
+}
+
+run_firstboot() {
+	loglabel=$1
+	errorhandler=${2:-default_firstboot_error_handler}
+	shift 2
+
+	if [ -z "$*" ]; then
+		return 0
+	fi
+
+	cmd_exit_code=''   # will be set in run_firstboot_cmd function
+	action "Configuring ${loglabel}:" run_firstboot_cmd "${loglabel}" cmd_exit_code "$@"
+ 
+	if [ $cmd_exit_code -ne 0 ]; then
+		$errorhandler "$loglabel" "$cmd_exit_code"
+	fi
+}

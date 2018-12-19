@@ -1,0 +1,53 @@
+#!/usr/bin/python
+
+import ram.widgets
+
+from utils import GetAvailableTimezones
+
+
+if __name__ == '__main__':
+    params = ram.param()
+    config = ram.query()
+
+    timezones = GetAvailableTimezones(params.zoneinfo)
+    _timezone = config['timezone']
+
+    def __SureItem(comments, timezone):
+        if ram.widgets.AskViaButtons(
+            "Select time zone",
+            "You selected '%s'.\n"
+            "The time zone will be set to '%s'.\n"
+            "Is that correct?" % (comments, timezone),
+        ):
+            return timezone
+        else:
+            return None
+
+    def __ZoneItem(comments, timezone):
+        return (comments, lambda comments=comments, timezone=timezone: __SureItem(comments, timezone))
+
+    def __MoreItem(country, timezones, tz=_timezone):
+        current = timezones[tz] if tz in timezones else None
+        zonemenu = [__ZoneItem(timezones[timezone], timezone) for timezone in timezones]
+        return (country, lambda: ram.widgets.RunMenu("Select Timezone - %s" % country, zonemenu, current=current))
+
+    current = None
+    zonemenu = []
+    for country in timezones:
+        _timezones = timezones[country]
+        if len(_timezones) == 1:
+            country_item = country
+            zonemenu.append(__ZoneItem(country_item, _timezones.keys()[0]))
+        else:
+            country_item = "%s ..." % country
+            zonemenu.append(__MoreItem(country_item, _timezones))
+        if _timezone in _timezones:
+            current = country_item
+
+    config['timezone'] = ram.widgets.RunMenu(
+        "Select Timezone - Select Country",
+        zonemenu, current=current,
+        itemOnly=params.forced
+    ) or _timezone
+
+    ram.store(input=config)

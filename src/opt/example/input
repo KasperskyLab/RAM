@@ -1,0 +1,36 @@
+#!/usr/bin/python
+
+import ram.widgets
+import ram.process
+import ram.watches
+
+if __name__ == '__main__':
+    def __RunPing():
+        ram.process.launch('ping 127.0.0.1')
+
+    def __BreakIt():
+        ram.widgets.SingleChoice("There are no entries to pick", "Use the force, Luke!", [])
+
+    def __Dynamic():
+        with ram.watches.watch_status('ping -c3 localhost') as watch:
+            ret, action = None, 0
+            while ret is None or not action or action is watch:
+                if not watch:
+                    options, watches = ["ping done..."], []
+                else:
+                    options, watches = ["pinging..."], [watch]
+
+                ret, action = ram.widgets.ActionChoice(
+                    header="Waiting for ping",
+                    text="",
+                    options=options,
+                    watches=watches,
+                )
+
+    menu = [
+        ("Ping localhost", __RunPing),
+        ("Empty dialog ...", __BreakIt),
+        ("Dynamic dialog ...", __Dynamic),
+    ]
+
+    ram.widgets.RunMenu("Select Action", menu)

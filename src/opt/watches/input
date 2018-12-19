@@ -1,0 +1,92 @@
+#!/usr/bin/python
+
+import ram.widgets
+import ram.watches
+
+from contextlib import nested
+
+if __name__ == '__main__':
+
+    def __RunMultiple():
+
+        with nested(
+            ram.watches.watch_status('ping -c3 localhost'),
+            ram.watches.watch_status('ping -c3 www.example.com'),
+            ram.watches.watch_status('dig www.example.com'),
+        ) as (ping_local, ping_remote, dig_remote):
+
+            def __mk_multiple():
+
+                _ping_local = (
+                    "~" if ping_local else
+                    ping_local()
+                )
+
+                _ping_remote = (
+                    "~" if ping_remote else
+                    ping_remote()
+                )
+
+                _dig_remote = (
+                    "~" if dig_remote else
+                    dig_remote()
+                )
+
+                return [
+                    ("Ping local: %s" % _ping_local, 0),
+                    ("Ping remote: %s" % _ping_remote, 1),
+                    ("Dig remote: %s" % _dig_remote, 2),
+                ]
+
+            ram.widgets.RunMenu(
+                "Watching in parallel",
+                __mk_multiple,
+                watches={ping_local: True, ping_remote: True, dig_remote: True}
+            )
+
+    def __RunCollects():
+
+        with ram.watches.watch_stdout('ping -c3 localhost') as watch:
+
+            output = []
+
+            def _read_stdout(data, watch=watch):
+                output.append(data)
+                if not watch:
+                    ram.widgets.ShowMessage("~", "".join(output))
+
+            ram.widgets.RunMenu(
+                "Watching io collects",
+                [],
+                watches={
+                    watch: _read_stdout,
+                }
+            )
+
+
+    #def __Sequence1():
+    #    with process.watch_status(..) as w1:
+    #        with process.watch_status(.., wait=w1) as w2:
+    #            with process.watch_status(.., wait=w3) as w3:
+    #                RunMenu(
+    #                    watches={w1:...,w2:...,w3:...}
+    #                )
+
+    #def __Semantics():
+    #    with process.watch_status(
+    #        'ping -c3 localhost',
+    #        'ping -c3 www.example.com',
+    #        'dig www.example.com'
+    #    ) as w:
+    #        RunMenu(
+    #            watches={_:True for _ in w}
+    #        )
+
+
+    ram.widgets.RunMenu(
+        "Select scenario",
+        [
+            ("Multiple ...", __RunMultiple),
+            ("Collects ...", __RunCollects),
+        ]
+    )

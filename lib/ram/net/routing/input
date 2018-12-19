@@ -1,0 +1,227 @@
+#!/usr/bin/python
+
+import ram.context
+import ram.widgets
+
+
+with ram.context(__name__):
+    from net.utils import ValidateEmptyOrIpV4, ValidateIpV4
+
+
+def SwitchGatewayDevice(config, delta):
+    ifaces = config['ifaces'].split()
+    current = config['default'] if config['default'] else "no"
+    options = ["no"] + ifaces[:]
+
+    ifname = options[(options.index(current) + delta) % len(options)]
+
+    config['default'] = ifname if ifname in ifaces else ""
+
+
+def SelectGatewayDevice(config, ensure=False):
+    ifaces = config['ifaces'].split()
+    current = config['default'] if config['default'] else "no"
+    options = ["no"] + ifaces[:]
+
+    if current not in options:
+        if not ram.widgets.AskViaButtons(
+            "Incorrect gateway device",
+            "Current interface for default route `%s`\n"
+            "is not available or enabled at the moment.\n\n"
+            "What would you like to do with gateway device?\n" % current,
+            "Select device ...", "Keep `%s`" % current
+        ):
+            return
+    elif ensure:
+        return
+
+    ifname = ram.widgets.SingleChoice("Select gateway device", "", options, current=current)
+    if ifname == current:
+        return
+
+    config['default'] = ifname if ifname in ifaces else ""
+
+
+def EditGatewayAddress(config, ifname):
+    if config[ifname]['usedhcp'] and not ram.widgets.AskViaButtons(
+        "Use static configuration?",
+        "Interface `%s` is configured to obtain gateway address via DHCP protocol.\n\n"
+        "Would you like to use static configuration?\n" % ifname
+    ):
+        config[ifname]['ignored'] = "dhcp"
+    else:
+        gateway, = ram.widgets.RunEntry(
+            "Interface gateway configuration",
+            "Specify IP address of the gateway for the interface `%s`." % ifname,
+            [
+                ("Gateway", config[ifname]['gateway'], ValidateEmptyOrIpV4),
+            ],
+        )
+        config[ifname]['gateway'] = gateway
+        config[ifname]['ignored'] = ""
+
+
+def __FormatLnRoute(ifname, address, netmask, gateway):
+    lnroute = "net %-15s mask %-15s" % (address, netmask)
+    lnroute += " via %-15s" % (gateway or '')
+    lnroute += " dev %s" % ifname
+    return lnroute
+
+
+def EditStaticRoute(config, rttable, idx):
+    if 0 <= idx < len(rttable):
+        ifname, (address, netmask, gateway), rtitem = rttable[idx]
+    else:
+        ifname, (address, netmask, gateway), rtitem = None, ('', '', ''), None
+
+    address, netmask, gateway = ram.widgets.AskEntries(
+        "Static route configuration",
+        "Specify IP address and netmask of destination with gateway address.",
+        [
+            ("Address:", address),
+            ("Netmask:", netmask),
+            ("Gateway:", gateway)
+        ],
+        "Ok"
+    )
+
+    invalid_text = \
+        ValidateIpV4("Address", address) + \
+        ValidateIpV4("Netmask", netmask) + \
+        ValidateIpV4("Gateway", gateway, True)
+
+    if invalid_text:
+        return ram.widgets.ShowError(
+            "Input address isn't valid",
+            invalid_text,
+            "Ok"
+        )
+
+    gwdevs = [gwname for gwname in config if not config.IsLoopback(gwname)]
+    ifname = ram.widgets.SingleChoice("Select interface to set route via", gwdevs, ifname)
+    rtdata = address, netmask, gateway
+
+    if rtitem:
+        rttext, rtfunc = rtitem
+        rttable[idx] = ifname, rtdata, (__FormatLnRoute(ifname, *rtdata), rtfunc)
+    else:
+        def __EditStaticRoute(idx=len(rttable)):
+            EditStaticRoute(config, rttable, idx)
+        rttable.append((ifname, rtdata, (__FormatLnRoute(ifname, *rtdata), __EditStaticRoute)))
+
+
+def DelStaticRoutes(config, rttable):
+    options = [(rtitem[0], idx, False) for idx, (ifname, rtdata, rtitem) in enumerate(rttable) if rtitem]
+    if options:
+        options = ram.widgets.AskCheckboxes("Select routes to delete", "", options, "Delete", "Cancel")
+        for idx, checked in options:
+            if checked:
+                rttable[idx] = ifname, rtdata, None
+
+
+def StaticRoutesMenu(config):
+    rttable = []
+
+    def __NewStaticRoute():
+        EditStaticRoute(config, rttable, idx=len(rttable))
+
+    def __RmStaticRoutes():
+        DelStaticRoutes(config, rttable)
+
+    idx = 0
+    for ifname in config:
+        _routes = config.GetIfaceStaticRoutes(ifname)
+        for i, rtdata in enumerate(_routes):
+            def __EditStaticRoute(idx=i):
+                EditStaticRoute(config, rttable, idx)
+            rttable.append((ifname, rtdata, (__FormatLnRoute(ifname, *rtdata), __EditStaticRoute)))
+            idx += 1
+
+    current = None
+    while True:
+        options = []
+        for ifname, rtdata, rtitem in rttable:
+            if rtitem:
+                options.append(rtitem)
+
+        if options:
+            options.append(("", 0))
+        options.append(("New route ...", __NewStaticRoute))
+        options.append(("Delete routes ...", __RmStaticRoutes))
+        options.append(("%20s" % "", 1))
+        options.append(("Go back ...", None))
+
+        watched, current = ram.widgets.RunMenu("Select Action - Routes", options, current, oneshot=True)
+        if not watched and not current:
+            break
+
+    for ifname in config:
+        _routes = [rtdata for ifgate, rtdata, rtitem in rttable if rtitem and ifname == ifgate]
+        config.SetIfaceStaticRoutes(ifname, _routes)
+
+
+def RoutesConfigurationMenu(config, wizard):
+
+    def __SelectGatewayDevice(action):
+        if action == ram.widgets.ACTION_SET:
+            SelectGatewayDevice(config)
+        elif action == ram.widgets.ACTION_INC:
+            SwitchGatewayDevice(config, +1)
+        elif action == ram.widgets.ACTION_DEC:
+            SwitchGatewayDevice(config, -1)
+
+    def __EditGatewayAddress(action):
+        if not config['default']:
+            SelectGatewayDevice(config)
+        else:
+            EditGatewayAddress(config, config['default'])
+
+    def __StaticRoutesMenu():
+        StaticRoutesMenu(config)
+
+    def __MkRoutesConfigurationMenu():
+        default = config['default']
+        usedhcp = config[default]['usedhcp'] if default else ""
+        ignored = config[default]['ignored'] if default else ""
+        gateway = config[default]['gateway'] if default else ""
+
+        if usedhcp and (ignored or not gateway):
+            gateway = "dhcp"
+
+        default = config['default'] if default else "no"
+
+        return [
+            ("%-16s" % ("Default route:"), 0),
+            ("%-16s < %6s >" % ("  Interface:", default.center(6)), __SelectGatewayDevice),
+            ("%-16s %-15s" % ("  Gateway:", gateway), __EditGatewayAddress),
+            #("", 1),
+            #("Edit static routes ...", __StaticRoutesMenu),
+        ]
+
+    SelectGatewayDevice(config, ensure=True)
+
+    ram.widgets.RunMenu(
+        "Select Action - Routing",
+        __MkRoutesConfigurationMenu,
+        current=__SelectGatewayDevice,
+        itemExit=wizard,
+        doAction=True
+    )
+
+
+if __name__ == '__main__':
+    config = ram.query()
+    params = ram.param()
+
+    ifaces = config['ifaces'].split()
+    if not params.device:
+        RoutesConfigurationMenu(config, params.wizard)
+    elif params.device == "no":
+        config['default'] = ""
+    elif params.device in ifaces:
+        config['default'] = params.device
+        EditGatewayAddress(config, config['default'])
+    elif params.device is not None:
+        raise SystemExit("No suitable device found on the machine.")
+
+    ram.store(input=config)

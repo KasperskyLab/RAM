@@ -1,0 +1,59 @@
+#!/usr/bin/python
+
+import os
+import ram.symbols
+
+
+def query_timezone(zoneinfo):
+    try:
+        return os.readlink('/etc/localtime')
+    except (IOError, OSError):
+        return ''
+
+
+def query_timezone_debian(zoneinfo):
+    tz = query_timezone(zoneinfo)
+    if not tz:
+        try:
+            tz = open('/etc/timezone').readline().strip()
+        except (IOError, OSError):
+            pass
+    return tz
+
+
+def query_timezone_redhat(zoneinfo):
+    tz = query_timezone(zoneinfo)
+    if not tz:
+        try:
+            for line in open('/etc/sysconfig/clock'):
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    var, sep, value = line.partition("=")
+                    if var == 'ZONE':
+                        tz = value
+                        break
+        except (IOError, OSError):
+            pass
+    return tz.strip("\"\'")
+
+
+def query_timezone_suse(zoneinfo):
+    tz = query_timezone(zoneinfo)
+    if not tz:
+        raise NotImplementedError()
+
+
+if __name__ == '__main__':
+    params = ram.param()
+    config = ram.symbols()
+
+    distro = ram.query('sys.distrib')['base']
+    query_timezone_distro = {
+        'redhat': query_timezone_redhat,
+        'debian': query_timezone_debian,
+        'suse': query_timezone_suse,
+    }.get(distro, lambda: '')
+
+    config['timezone'] = query_timezone_distro(params.zoneinfo)
+
+    ram.symbols.send(config)

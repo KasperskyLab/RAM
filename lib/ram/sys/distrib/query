@@ -1,0 +1,24 @@
+#!/usr/bin/python
+
+import ram.symbols
+
+from platform import linux_distribution
+
+if __name__ == '__main__':
+    config = ram.symbols()
+
+    distrib, version, distid = linux_distribution(full_distribution_name=0)
+    distrib = distrib.lower()
+
+    config['name'] = distrib
+    config['version'] = version
+
+    if distrib in ['ubuntu', 'debian']:
+        config['base'] = 'debian'
+    elif distrib in ['fedora', 'centos', 'redhat']:
+        config['base'] = 'redhat'
+    else:
+        config['base'] = distrib
+
+    ram.symbols.send(config)
+

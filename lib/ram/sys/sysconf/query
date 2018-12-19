@@ -1,0 +1,14 @@
+#!/usr/bin/python
+
+import ram.symbols
+import os
+
+if __name__ == '__main__':
+    config = ram.symbols()
+
+    config['nprocessors_onln'] = str(os.sysconf('SC_NPROCESSORS_ONLN'))
+    config['page_size'] = str(os.sysconf('SC_PAGE_SIZE'))
+    config['phys_pages'] = str(os.sysconf('SC_PHYS_PAGES'))
+    config['_total_mem'] = str(os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES'))
+
+    ram.symbols.send(config)

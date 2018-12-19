@@ -1,0 +1,4 @@
+#!/bin/sh
+
+ram apply net.hostname
+ram apply net.ifconfig

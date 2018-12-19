@@ -1,0 +1,51 @@
+#!/bin/sh
+
+set -e
+
+if [ -n "$RAMDEBUG" ]; then
+	set -x
+fi
+
+_RAM_SYMBOLS=
+
+_ram_symbols_send() {
+	echo "$_RAM_SYMBOLS" >&${RAMCHAN}
+}
+
+_ram_symbols_recv() {
+	_RAM_SYMBOLS="$(cat <&${RAMCHAN})"
+}
+
+_ram_symbols_new() {
+	_RAM_SYMBOLS="$(echo "$*" | ram-symbols new)"
+}
+
+_ram_symbols_set() {
+	local _keyname=${1}
+	local _keydata=${2}
+
+	_RAM_SYMBOLS="$(echo "${_RAM_SYMBOLS}" | ram-symbols set "${_keyname}" "${_keydata}")"
+}
+
+_ram_symbols_get() {
+	local _keyname=${1}
+
+	echo "${_RAM_SYMBOLS}" | ram-symbols get "${_keyname}"
+}
+
+_ram_symbols_lst() {
+	echo "${_RAM_SYMBOLS}" | ram-symbols lst "$@"
+}
+
+_ram_symbols_cut() {
+	echo "${_RAM_SYMBOLS}" | ram-symbols cut "$@"
+}
+
+_ram_symbols_put() {
+	local _keyname=${1}
+	shift
+
+	local _clean="$(echo "${_RAM_SYMBOLS}" | ram-symbols set "${_keyname}" "")"
+	local _ready="$(echo "$*" | ram-symbols put "${_keyname}")"
+	_RAM_SYMBOLS="$((echo "$_clean"; echo "$_ready") | ram-symbols new)"
+}

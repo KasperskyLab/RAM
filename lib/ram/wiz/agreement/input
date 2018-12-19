@@ -1,0 +1,66 @@
+#!/usr/bin/python
+
+from glob import iglob
+from os.path import normpath
+
+import ram.widgets
+
+
+HEADER = "Select License Agreement Language"
+
+
+if __name__ == '__main__':
+    params = ram.param()
+
+    if not params.path:
+        raise SystemExit("mandatory argument 'path' is omitted.")
+    else:
+        params.path = normpath(params.path)
+
+    sufs = sorted(file[len(params.path):] for file in iglob(params.path + '*'))
+    if not sufs:
+        raise SystemExit("no files found at specified path: %s" % params.path)
+    elif params.lang and params.lang not in sufs:
+        raise SystemExit("language `%s` is not available" % params.lang)
+
+    def __ShowEula(lang):
+        with open(params.path + lang) as f:
+            text = f.readlines()
+        if not text:
+            raise SystemExit("empty EULA text file.")
+        header = params.header or text.pop(0).strip()
+        while text and not text[0].strip():
+            text.pop(0)
+
+        agree = "I accept the terms"
+        dont_agree = "I decline the terms"
+        answer = None
+
+        answer = ram.widgets.VoteText(
+            header=header,
+            text="".join(text),
+            reflow=params.reflow,
+            buttons=["Ok"] if params.review else [agree, dont_agree]
+        )
+        if params.review or answer == agree.lower():
+            return True
+        elif params.lang or not params.forced:
+            return False
+
+    answer = None
+    while answer is None or params.forced:
+        if params.lang or not sufs[1:]:
+            answer = __ShowEula(params.lang or sufs[0])
+        else:
+            header, text = (params.header, HEADER) if params.header else (HEADER, "")
+            answer = ram.widgets.RunMenu(
+                header,
+                [(lang, lambda lang=lang: __ShowEula(lang)) for lang in sufs],
+                text=text,
+                itemOnly=not params.review,
+            )
+
+        if answer or params.review:
+            raise SystemExit()
+
+    raise SystemExit(params.failed or True)

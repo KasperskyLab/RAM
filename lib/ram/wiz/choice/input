@@ -1,0 +1,18 @@
+#!/usr/bin/python
+
+import ram.widgets
+
+
+if __name__ == '__main__':
+    params = ram.param()
+    
+    choice = ram.widgets.SingleChoice(
+        params.header,
+        params.text,
+        params.options.split(','),
+    )
+
+    if choice is None:
+        raise SystemExit('No choice was made.')
+    else:
+        print choice

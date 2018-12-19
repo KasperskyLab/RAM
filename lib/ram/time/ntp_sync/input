@@ -1,0 +1,26 @@
+#!/usr/bin/python
+
+import utils
+import ram.context
+import ram.widgets
+import ram.watches
+
+
+with ram.context(__name__):
+    from wiz.entry import RunListEntry
+    from net.utils import ValidateHostnameOrIpV4
+
+if __name__ == '__main__':
+    config = ram.query()
+    params = ram.param()
+
+    config['ntpservers'] = ' '.join(RunListEntry(
+        "Configure NTP servers",
+        "Specify NTP servers for time and date synchronization.\n\n",
+        "NTP server",
+        utils.query_ntp_servers(),
+        ValidateHostnameOrIpV4,
+        itemExit=params.wizard,
+    ))
+
+    ram.store(input=config)

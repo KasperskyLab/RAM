@@ -1,0 +1,10 @@
+#!/usr/bin/python
+
+import time
+
+import ram.symbols
+
+if __name__ == '__main__':
+    config = ram.symbols()
+    config['timestamp'] = str(time.time())
+    ram.symbols.send(config)

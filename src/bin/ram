@@ -1,0 +1,33 @@
+#!/usr/bin/python
+
+import sys
+
+import ram
+import ram.options
+
+from ram.process import ProcessError
+
+
+_debug = ram.options['debug']
+
+if __name__ == '__main__':
+    ramexec = sys.argv.pop(0)
+    srvname = sys.argv.pop(0) if sys.argv else ''
+
+    try:
+        if srvname:
+            service = ram.service[srvname]
+        else:
+            service = ram.service['usage']
+            del sys.argv[:]
+
+        for result in service._iterate(*sys.argv, input=sys.stdin):
+            if result is not None:
+                print str(result)
+    except ProcessError as e:
+        raise SystemExit(*e.args)
+    except Exception as e:
+        if _debug:
+            raise
+        else:
+            raise SystemExit(str(e))

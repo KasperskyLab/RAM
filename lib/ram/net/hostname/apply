@@ -1,0 +1,10 @@
+#!/bin/sh
+
+. /usr/share/ram/ram.functions
+
+hostname=`ram print - hostname`
+
+if [ "$hostname" != "`hostname`" ]; then
+	hostname "$hostname"
+	service rsyslog force-reload
+fi
